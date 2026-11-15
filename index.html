@@ -301,6 +301,28 @@ input{font:inherit}
 .ltable{height:380px;margin:6px 0 10px}
 .home>*,.lobby>*{flex-shrink:0}
 .codebtn{background:none;border:0;color:#fff;font-weight:800;cursor:pointer;padding:0;display:block;margin:0 auto}
+
+/* chat messages: one fixed spot per seat */
+.say{position:absolute;z-index:9;background:#fff;color:#1d2a36;font-weight:700;font-size:14px;line-height:1.2;padding:6px 10px;border-radius:12px;
+  width:max-content;max-width:118px;box-shadow:0 2px 8px rgba(0,0,0,.3);animation:say 5s ease-out both;pointer-events:none}
+.say.emo{font-size:32px;padding:2px 6px;background:rgba(255,255,255,.92)}
+.seat.top .say{right:calc(100% + 8px);top:4px}
+.seat.left .say{left:0;top:calc(100% + 6px)}
+.seat.right .say{right:0;top:calc(100% + 6px)}
+.seat.bottom .say{left:calc(100% + 8px);bottom:14px}
+@keyframes say{0%{opacity:0;scale:.6}5%{opacity:1;scale:1.08}9%{scale:1}90%{opacity:1}100%{opacity:0}}
+
+/* every bubble sits outside the middle of the table, so it never covers cards or the centre message */
+.seat .bigbub,.seat .say{position:absolute;z-index:9;font-size:15px;padding:6px 12px;border-radius:12px;width:max-content;max-width:120px;white-space:normal;text-align:center;line-height:1.15}
+.seat .bigbub{font-size:16px}
+.seat.left .bigbub,.seat.left .say{left:0;right:auto;top:calc(100% + 6px);bottom:auto}
+.seat.right .bigbub,.seat.right .say{right:0;left:auto;top:calc(100% + 6px);bottom:auto}
+.seat.top .bigbub,.seat.top .say{left:calc(100% + 8px);right:auto;top:64px;bottom:auto}
+.seat.bottom .bigbub,.seat.bottom .say{left:calc(100% + 8px);right:auto;bottom:10px;top:auto}
+.seat .say.emo,.seat .bigbub.react.emo{font-size:30px;padding:2px 6px}
+/* yellow announcements live in the empty space under the score */
+.announce{top:128px;bottom:auto;left:8px;right:auto;transform:none;max-width:150px;white-space:normal;text-align:left;font-size:13px;padding:6px 10px}
+.seat.bottom .bigbub,.seat.bottom .say{max-width:calc(50vw - 84px)}
 </style>
 </head>
 <body>
@@ -1761,7 +1783,7 @@ input{font:inherit}
     onState(prev, v) {
       if (v && prev && v.log.length && JSON.stringify(v.log) !== JSON.stringify(prev.log)) {
         const fresh = v.log.filter((x) => !prev.log.includes(x));
-        const hit = fresh.filter((x) => /Belote|Tierce|Quarte|Quint|Carré|Redeal|Double|Redouble/.test(x));
+        const hit = fresh.filter((x) => /Belote|Tierce|Quarte|Quint|Carré|Double|Redouble/.test(x));
         if (hit.length) { this.announce = { text: hit.join(' · '), t0: Date.now(), until: Date.now() + 2600 }; setTimeout(() => this.render(), 2700); }
       }
       if (v && prev && v.dealNo !== prev.dealNo) { this.overlay = null; }
@@ -1812,9 +1834,9 @@ input{font:inherit}
       if (!(seat >= 0 && seat < 4) || !REACTIONS[i]) return;
       const now = Date.now();
       this.reacts = this.reacts || {};
-      this.reacts[seat] = { i, t0: now, until: now + 3000 };
+      this.reacts[seat] = { i, t0: now, until: now + 5000 };
       clearTimeout(this.reactT);
-      this.reactT = setTimeout(() => this.render(), 3050);
+      this.reactT = setTimeout(() => this.render(), 5050);
       this.render();
     },
     chatHTML() {
@@ -1969,9 +1991,12 @@ input{font:inherit}
         const mine = v.bids.filter((b) => b.seat === seat);
         if (mine.length) tab = `<div class="btab ${mine[mine.length - 1].bid === 'pass' ? 'pass' : ''}">${this.bidShort(mine[mine.length - 1].bid)}</div>`;
       }
+      // chat message: its own spot per seat, away from the cards and the bid bubbles
       const rx = this.reacts && this.reacts[seat];
-      if (rx && now < rx.until) big = `<div class="bigbub react ${rx.i < 8 ? 'emo' : ''}" style="animation-delay:${rx.t0 - now}ms">${esc(REACTIONS[rx.i])}</div>`;
-      else if (this.pop && this.pop.seat === seat && now < this.pop.until) big = `<div class="bigbub ${this.pop.bid === 'pass' ? 'pass' : ''}" style="animation-delay:${this.pop.t0 - now}ms">${this.bidShort(this.pop.bid)}</div>`;
+      let say = rx && now < rx.until ? `<div class="say ${rx.i < 8 ? 'emo' : ''}" style="animation-delay:${rx.t0 - now}ms">${esc(REACTIONS[rx.i])}</div>` : '';
+      if (this.pop && this.pop.seat === seat && now < this.pop.until) big = `<div class="bigbub ${this.pop.bid === 'pass' ? 'pass' : ''}" style="animation-delay:${this.pop.t0 - now}ms">${this.bidShort(this.pop.bid)}</div>`;
+      // one bubble per player: the newest of bid and chat (the bid stays visible on the orange tab)
+      if (big && say) { if (rx.t0 > this.pop.t0) big = ''; else say = ''; }
       const tags = [];
       if (v.phase === 'play' || v.phase === 'trickDone' || v.phase === 'dealEnd') {
         for (const d of v.announced[seat] || []) tags.push(this.declShort(d, seat === Client.seat || v.phase === 'dealEnd' || v.phase === 'gameOver'));
@@ -2002,7 +2027,7 @@ input{font:inherit}
         ${backs}
         ${tab}
         <div class="plate" style="animation-delay:${-(now % 1400)}ms">${this.avatarOf(L.seats[seat], name)}<div class="nm">${esc(name)}${online ? '' : ' <small>(offline)</small>'}</div>${v.dealer === seat ? '<span class="dchip">D</span>' : ''}${bidder}${clock}</div>
-        ${big}
+        ${big}${say}
         ${tags.length ? `<div class="tags">${tags.map((t) => `<span>${t}</span>`).join('')}</div>` : ''}
       </div>`;
     },
