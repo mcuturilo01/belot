@@ -230,6 +230,49 @@ input{font:inherit}
 .bigbub.react{font-size:17px;padding:8px 14px;width:max-content;max-width:200px;white-space:normal;text-align:center;line-height:1.2;animation:bubr 3s ease-out both}
 .bigbub.react.emo{font-size:38px;padding:4px 10px;background:transparent;box-shadow:none}
 @keyframes bubr{0%{opacity:0;scale:.4}8%{opacity:1;scale:1.12}14%{scale:1}88%{opacity:1}100%{opacity:0}}
+
+/* score with the contract under it (belot.bg style) */
+.scorecol{display:flex;flex-direction:column;width:150px}
+.scorecol .score{border-bottom:0;border-radius:12px 12px 0 0;justify-content:center}
+.ctbar{background:#f5a623;color:#1d2a36;border-radius:0 0 12px 12px;min-height:34px;display:flex;align-items:center;gap:6px;padding:3px 10px;font-size:12px;line-height:1.15}
+.ctbar.empty{min-height:8px;padding:0}
+.ctbar .cti{font-size:22px;font-weight:900;color:#1d2a36}
+.ctbar .cti.redt{color:#c62828}
+.ctbar .ctt{display:flex;flex-direction:column;min-width:0}
+.ctbar .ctt b{font-size:13px}
+.ctbar .ctt span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px}
+.topbar{align-items:flex-start}
+/* player tiles: big avatar with the name under it */
+.seat{max-width:none}
+.seat:not(.bottom) .plate{flex-direction:column;gap:3px;border-radius:14px;padding:6px 6px 5px;width:86px}
+.seat:not(.bottom) .av{width:66px;height:66px;border-radius:12px;font-size:34px}
+.seat:not(.bottom) .nm{font-size:13px;max-width:76px;text-align:center}
+.seat:not(.bottom) .nm small{display:block}
+.seat:not(.bottom) .bid-chip{position:absolute;left:-8px;top:-8px}
+.seat.bottom .av{width:46px;height:46px;border-radius:10px;font-size:24px}
+.seat.bottom .plate{border-radius:14px;padding:4px 14px 4px 4px;gap:10px}
+.seat.bottom .nm{font-size:16px}
+.seat.left,.seat.right{top:47%}
+.seat.top .backs{position:absolute;left:calc(100% + 8px);top:30px}
+.seat.top .tags{position:absolute;right:calc(100% + 8px);top:18px;flex-direction:column;align-items:flex-end;margin:0}
+.seat.top .bigbub{top:calc(100% + 4px)}
+/* tile size tuned so the side players stay visible next to the bid panel */
+.seat:not(.bottom) .plate{width:80px}
+.seat:not(.bottom) .av{width:60px;height:60px;font-size:32px}
+.center.low .panel.bidpanel{max-width:232px;padding:8px}
+.bidpanel .bidb{font-size:12px;padding:5px 2px}
+.bidpanel .bidb .bi{font-size:22px}
+.bidpanel .btn.pass{font-size:22px;padding:8px}
+.bhist{font-size:11px}
+@media (max-height:700px){
+  .seat:not(.bottom) .plate{width:68px;padding:4px 4px 3px}
+  .seat:not(.bottom) .av{width:46px;height:46px;font-size:26px;border-radius:10px}
+  .seat:not(.bottom) .nm{font-size:12px;max-width:62px}
+  .seat.bottom .av{width:38px;height:38px;font-size:20px}
+  .seat.top .backs{top:18px}
+  .trick{top:48%}
+}
+.announce{top:94px;right:8px;left:auto;transform:none;font-size:14px;padding:6px 12px;max-width:58%;white-space:normal;text-align:right}
 </style>
 </head>
 <body>
@@ -931,7 +974,7 @@ input{font:inherit}
       this.practice = !!o.practice;
       this.players = {};
       this.game = null;
-      this.settings = { turnSecs: 20 };
+      this.settings = { turnSecs: 10 };
       this.timer = null; this.timerSeq = -1; this.clock = null;
       this.F = o.fast ? 0.15 : 1;
     }
@@ -940,6 +983,7 @@ input{font:inherit}
       this.players = d.players || {};
       this.game = d.game || null;
       if (d.settings) this.settings = d.settings;
+      if (![5, 10, 20].includes(this.settings.turnSecs)) this.settings.turnSecs = 10; // older options
       if (d.owner) this.owner = d.owner;
       if (d.practice) this.practice = true;
       for (const t in this.players) if (!this.players[t].bot) this.players[t].online = false;
@@ -1019,7 +1063,7 @@ input{font:inherit}
       }
       if (m.k === 'timer' && host) {
         const v = Number(m.secs);
-        if ([0, 10, 20, 30, 60].includes(v)) { this.settings.turnSecs = v; this.timerSeq = -1; }
+        if ([5, 10, 20].includes(v)) { this.settings.turnSecs = v; this.timerSeq = -1; }
         return this.changed();
       }
       if (m.k === 'start' && host) {
@@ -1877,8 +1921,8 @@ input{font:inherit}
       return `<div class="pclock ${urgent}"><i style="width:${(left / ck.limit) * 100}%;animation-duration:${left}ms;animation-delay:${Math.max(0, ck.start - now)}ms"></i><b class="cks ${urgent}" style="animation-delay:${-(now % 1000)}ms" data-end="${ck.end}">${Math.ceil(Math.min(left, ck.limit) / 1000)}</b></div>`;
     },
     timerRow(secs) {
-      if (!this.host()) return `<div class="small muted trow">Turn timer: ${secs ? secs + ' s' : 'off'}</div>`;
-      return `<div class="trow"><span class="small">Turn timer</span>${[10, 20, 30, 60, 0].map((t) => `<button class="chip ${t === secs ? 'on' : ''}" data-a="timer" data-t="${t}">${t ? t + 's' : 'Off'}</button>`).join('')}</div>`;
+      if (!this.host()) return `<div class="small muted trow">Turn timer: ${secs} s</div>`;
+      return `<div class="trow"><span class="small">Turn timer</span>${[5, 10, 20].map((t) => `<button class="chip ${t === secs ? 'on' : ''}" data-a="timer" data-t="${t}">${t}s</button>`).join('')}</div>`;
     },
     bidShort(b) {
       if (b === 'pass') return 'PASS';
@@ -1966,9 +2010,11 @@ input{font:inherit}
       const us = this.myTeam();
       const ct = v.contract;
       const top = `<div class="topbar">
-        <button class="score" data-a="history"><div><small>US</small><b>${v.scores[us]}</b></div><div><small>THEM</small><b>${v.scores[1 - us]}</b></div></button>
-        <div class="ctinfo">${ct && v.phase !== 'bid' ? `<div class="ct">${this.ctChip(ct)} <small>${CT_LABEL[ct.type]}</small></div><div class="small">${esc(v.names[ct.bidder])}</div>` : v.phase === 'bid' && ct ? `<div class="ct">${this.ctChip(ct)}</div><div class="small">${esc(v.names[ct.bidder])}</div>` : '<div class="small muted">Deal ' + v.dealNo + '</div>'}
-          ${v.hang ? `<div class="small hang">Hanging: ${v.hang}</div>` : ''}</div>
+        <div class="scorecol">
+          <button class="score" data-a="history"><div><small>US</small><b>${v.scores[us]}</b></div><div><small>THEM</small><b>${v.scores[1 - us]}</b></div></button>
+          <div class="ctbar ${ct ? '' : 'empty'}">${ct ? `<span class="cti ${RED[ct.type] ? 'redt' : ''}">${CT_ICON[ct.type]}</span><span class="ctt"><b>${CT_LABEL[ct.type]}${ct.mult > 1 ? ' ×' + ct.mult : ''}</b><span>${esc(v.names[ct.bidder])}</span></span>` : ''}</div>
+        </div>
+        <div class="ctinfo"><div class="small muted">Deal ${v.dealNo}</div>${v.hang ? `<div class="small hang">Hanging: ${v.hang}</div>` : ''}</div>
         <div class="tbtns">${v.lastTrick ? '<button class="btn tiny ghost" data-a="last">Last trick</button>' : ''}<button class="btn tiny ghost" data-a="menu">☰</button></div>
       </div>`;
       const seats = [0, 1, 2, 3].map((s) => this.seatHTML(v, s)).join('');
