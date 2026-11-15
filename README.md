@@ -10,3 +10,10 @@ Bulgarian belot (belot.bg rules) for 4 players on their phones. No app, no accou
 4. The host keeps the page open during the game.
 
 Practice alone: tap **Practice vs 3 bots**.
+
+## Game server (optional, recommended)
+
+`server/` is a small Cloudflare Worker that runs the table, so phones can switch apps or lose signal
+and come back to the same game. Deploy it from the Cloudflare dashboard by importing this repository
+with root directory `server`. Until the server address is set in the game, phones connect directly
+to each other.
