@@ -713,7 +713,14 @@
       // owner gone: any seated person can run the table
       return !!(p && !p.bot && p.seat >= 0 && (!o || !o.online));
     }
-    hello(tok, name) {
+    // characters 0..7; two people never share one
+    freeAvatar(tok, want) {
+      const taken = new Set(Object.entries(this.players).filter(([t, q]) => t !== tok && !q.bot && Number.isInteger(q.avatar)).map(([, q]) => q.avatar));
+      if (Number.isInteger(want) && want >= 0 && want <= 7 && !taken.has(want)) return want;
+      for (let i = 0; i < 8; i++) if (!taken.has(i)) return i;
+      return null;
+    }
+    hello(tok, name, avatar) {
       if (typeof tok !== 'string' || tok.length < 8 || tok[0] === '#') return false;
       let p = this.players[tok];
       if (!p) {
@@ -721,6 +728,7 @@
         p = this.players[tok] = { seat: -1, name: cleanName(name) };
       }
       if (!this.game || p.seat < 0) p.name = cleanName(name);
+      p.avatar = this.freeAvatar(tok, Number.isInteger(avatar) ? avatar : p.avatar);
       const was = p.online;
       p.online = true; p.seen = Date.now();
       if (!this.owner) this.owner = tok;
@@ -749,7 +757,7 @@
     /* ---------- messages ---------- */
     handle(tok, m) {
       if (!m || typeof m !== 'object') return;
-      if (m.k === 'hello') return this.hello(tok, m.name);
+      if (m.k === 'hello') return this.hello(tok, m.name, m.avatar);
       const p = this.players[tok];
       if (!p) return;
       p.seen = Date.now();
@@ -791,6 +799,12 @@
         this.game = E.newMatch(this.game.names);
         return this.changed();
       }
+      if (m.k === 'avatar') {
+        const a = Number(m.a);
+        if (this.freeAvatar(tok, a) !== a) { this.o.send(tok, { k: 'err', err: 'Someone already picked that character' }); return this.sendTo(tok); }
+        p.avatar = a;
+        return this.changed();
+      }
       if (m.k === 'react') {
         // quick chat: one of 16 fixed options, at most one every 2 s per player
         const i = Number(m.i);
@@ -830,7 +844,9 @@
       return {
         code: this.code, started: !!this.game, turnSecs: this.settings.turnSecs, kind: this.practice ? 'practice' : this.kind,
         youHost: this.isHost(tok), hostName: owner ? owner.name : '',
-        seats: seated.map((p) => (p ? { name: p.name, online: !!p.online, host: p === owner, bot: !!p.bot } : null)),
+        seats: seated.map((p) => (p ? { name: p.name, online: !!p.online, host: p === owner, bot: !!p.bot, avatar: p.bot ? null : (Number.isInteger(p.avatar) ? p.avatar : null) } : null)),
+        taken: Object.entries(this.players).filter(([t, q]) => t !== tok && !q.bot && Number.isInteger(q.avatar)).map(([, q]) => q.avatar),
+        yourAvatar: this.players[tok] && Number.isInteger(this.players[tok].avatar) ? this.players[tok].avatar : null,
         watchers: Object.values(this.players).filter((p) => p.seat < 0 && p.online).map((p) => p.name),
       };
     }
@@ -978,7 +994,7 @@ export class BelotRoom {
       // a newer connection of the same player replaces the old one
       for (const [w, t] of this.socks) if (t === tok && w !== ws) { this.socks.delete(w); try { w.close(4000, 'replaced'); } catch (e) { /* ignore */ } }
       this.socks.set(ws, tok);
-      this.table.hello(tok, m.name);
+      this.table.hello(tok, m.name, m.avatar);
       return;
     }
     if (known) this.table.handle(known, m);
