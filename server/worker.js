@@ -790,6 +790,16 @@
         this.game = E.newMatch(this.game.names);
         return this.changed();
       }
+      if (m.k === 'react') {
+        // quick chat: one of 16 fixed options, at most one every 2 s per player
+        const i = Number(m.i);
+        if (!Number.isInteger(i) || i < 0 || i > 15 || p.seat < 0) return;
+        const now = Date.now();
+        if (p.lastReact && now - p.lastReact < 2000) return;
+        p.lastReact = now;
+        for (const t in this.players) if (!this.players[t].bot && this.players[t].online) this.o.send(t, { k: 'react', seat: p.seat, i });
+        return;
+      }
       if (m.k === 'act') {
         if (!this.game || p.seat < 0) return;
         if (m.id && p.lastAct === m.id) return this.sendTo(tok); // duplicate (resend)

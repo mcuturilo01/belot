@@ -216,6 +216,20 @@ input{font:inherit}
 .pclock .cks{right:-32px;top:-5px;bottom:auto}
 
 .announce{animation:pop .2s ease-out both}
+
+/* quick chat */
+.chatbtn{position:absolute;left:8px;bottom:calc(var(--cw,70px)*1.42 + 34px);width:44px;height:44px;border-radius:50%;border:0;background:#1f8fff;color:#fff;font-size:22px;box-shadow:0 2px 8px rgba(0,0,0,.35);z-index:8}
+.game{position:relative}
+.sheet.chat{max-width:380px;padding:12px}
+.rxgrid{display:grid;gap:8px}
+.rxgrid.emo{grid-template-columns:repeat(4,1fr);margin-bottom:12px}
+.rxgrid.txt{grid-template-columns:1fr 1fr}
+.rx{border:0;border-radius:12px;background:#e6f2f5;color:#1d2a36;font-weight:700;font-size:14px;padding:10px 6px;min-height:44px}
+.rx.emo{font-size:30px;padding:6px;background:rgba(255,255,255,.12)}
+.rx:active{transform:scale(.94)}
+.bigbub.react{font-size:17px;padding:8px 14px;width:max-content;max-width:200px;white-space:normal;text-align:center;line-height:1.2;animation:bubr 3s ease-out both}
+.bigbub.react.emo{font-size:38px;padding:4px 10px;background:transparent;box-shadow:none}
+@keyframes bubr{0%{opacity:0;scale:.4}8%{opacity:1;scale:1.12}14%{scale:1}88%{opacity:1}100%{opacity:0}}
 </style>
 </head>
 <body>
@@ -1020,6 +1034,16 @@ input{font:inherit}
         this.game = E.newMatch(this.game.names);
         return this.changed();
       }
+      if (m.k === 'react') {
+        // quick chat: one of 16 fixed options, at most one every 2 s per player
+        const i = Number(m.i);
+        if (!Number.isInteger(i) || i < 0 || i > 15 || p.seat < 0) return;
+        const now = Date.now();
+        if (p.lastReact && now - p.lastReact < 2000) return;
+        p.lastReact = now;
+        for (const t in this.players) if (!this.players[t].bot && this.players[t].online) this.o.send(t, { k: 'react', seat: p.seat, i });
+        return;
+      }
       if (m.k === 'act') {
         if (!this.game || p.seat < 0) return;
         if (m.id && p.lastAct === m.id) return this.sendTo(tok); // duplicate (resend)
@@ -1379,6 +1403,9 @@ input{font:inherit}
 
   // timings (ms): cut + deal animations, trick collection
   const PACE = { cut: 800, step: 170, fly: 320, banner: 900, hold: 350, slide: 320, deal5: 2800, deal3: 2300, collect: 1500 };
+  // quick chat options (index is what travels over the network)
+  const REACTIONS = ['😂', '😘', '🤭', '😭', '🥺', '😡', '😈', '🤡',
+    'nice job pal', 'good luck', 'thanks', 'too easy', 'hurry up 🐢', 'so lucky', 'just give up', 'im getting bored here'];
   const SYM = { C: '♣︎', D: '♦︎', H: '♥︎', S: '♠︎' };
   const RED = { D: 1, H: 1 };
   const RLAB = { T: '10' };
@@ -1491,6 +1518,8 @@ input{font:inherit}
         if (this.pending && (!m.view || m.view.seq !== this.pending.seq)) this.pending = null;
         if (!this.local && m.lobby) { store.set('belot-client', { code: m.lobby.code, t: Date.now() }); this.create = false; }
         UI.onState(prev, this.view);
+      } else if (m.k === 'react') {
+        UI.showReact(m.seat, m.i);
       } else if (m.k === 'err') {
         if (m.fatal) { store.del('belot-client'); if (this.net) this.net.close(); UI.toast(m.err); setTimeout(() => App.leave(), 1800); return; }
         if (this.pending && this.pending.id === m.id) this.pending = null;
@@ -1652,6 +1681,21 @@ input{font:inherit}
       this.render();
     },
     host() { return !!(Client.lobby && Client.lobby.youHost); },
+    showReact(seat, i) {
+      if (!(seat >= 0 && seat < 4) || !REACTIONS[i]) return;
+      const now = Date.now();
+      this.reacts = this.reacts || {};
+      this.reacts[seat] = { i, t0: now, until: now + 3000 };
+      clearTimeout(this.reactT);
+      this.reactT = setTimeout(() => this.render(), 3050);
+      this.render();
+    },
+    chatHTML() {
+      const b = (i) => `<button class="rx ${i < 8 ? 'emo' : ''}" data-a="react" data-i="${i}">${esc(REACTIONS[i])}</button>`;
+      const emo = [0, 1, 2, 3, 4, 5, 6, 7].map(b).join('');
+      const txt = [8, 9, 10, 11, 12, 13, 14, 15].map(b).join('');
+      return `<div class="overlay" data-a="close"><div class="sheet chat"><div class="rxgrid emo">${emo}</div><div class="rxgrid txt">${txt}</div></div></div>`;
+    },
     rel(seat) { const my = Client.seat >= 0 ? Client.seat : 0; return (seat - my + 4) % 4; },
     myTeam() { return (Client.seat >= 0 ? Client.seat : 0) % 2; },
 
@@ -1787,7 +1831,9 @@ input{font:inherit}
         const mine = v.bids.filter((b) => b.seat === seat);
         if (mine.length) tab = `<div class="btab ${mine[mine.length - 1].bid === 'pass' ? 'pass' : ''}">${this.bidShort(mine[mine.length - 1].bid)}</div>`;
       }
-      if (this.pop && this.pop.seat === seat && now < this.pop.until) big = `<div class="bigbub ${this.pop.bid === 'pass' ? 'pass' : ''}" style="animation-delay:${this.pop.t0 - now}ms">${this.bidShort(this.pop.bid)}</div>`;
+      const rx = this.reacts && this.reacts[seat];
+      if (rx && now < rx.until) big = `<div class="bigbub react ${rx.i < 8 ? 'emo' : ''}" style="animation-delay:${rx.t0 - now}ms">${esc(REACTIONS[rx.i])}</div>`;
+      else if (this.pop && this.pop.seat === seat && now < this.pop.until) big = `<div class="bigbub ${this.pop.bid === 'pass' ? 'pass' : ''}" style="animation-delay:${this.pop.t0 - now}ms">${this.bidShort(this.pop.bid)}</div>`;
       const tags = [];
       if (v.phase === 'play' || v.phase === 'trickDone' || v.phase === 'dealEnd') {
         for (const d of v.announced[seat] || []) tags.push(this.declShort(d, v.trickNo >= 1 || seat === Client.seat));
@@ -2002,9 +2048,10 @@ input{font:inherit}
       if (this.overlay === 'history') overlay = this.historyHTML(v);
       if (this.overlay === 'menu') overlay = this.menuHTML();
       if (this.overlay === 'rules') overlay = this.rulesHTML();
+      if (this.overlay === 'chat') overlay = this.chatHTML();
       if (this.overlay === 'leave') overlay = `<div class="overlay"><div class="sheet"><div class="shead">Leave the table?</div><p class="small">${Client.local && !(Client.lobby && Client.lobby.kind === 'practice') ? 'You are the host. The game stops for everyone until you come back with Resume.' : 'You can rejoin with the same link.'}</p><button class="btn danger" data-a="leave">Leave</button><button class="btn ghost" data-a="close">Stay</button></div></div>`;
       return `<div class="game">${top}<div class="felt">${seats}<div class="trick">${trick}</div><div class="center ${this.centerLow ? 'low' : ''}">${center}</div>${this.fxHTML(v)}</div>
-        ${actionBar}<div class="hand" id="hand" style="--cw:${fan.cw}px">${handHTML}</div>${overlay}</div>`;
+        ${actionBar}<div class="hand" id="hand" style="--cw:${fan.cw}px">${handHTML}</div>${my >= 0 ? '<button class="chatbtn" data-a="chat" aria-label="Quick chat">💬</button>' : ''}${overlay}</div>`;
     },
     bidPanel(opts, v) {
       const b = (k, icon, label, cls = '') => `<button class="bidb ${cls}" data-a="bid" data-b="${k}" ${opts.includes(k) ? '' : 'disabled'}><span class="bi ${RED[k] ? 'redt' : ''}">${icon}</span><span>${label}</span></button>`;
@@ -2164,6 +2211,15 @@ input{font:inherit}
           this.overlay = 'leave'; return this.render();
         case 'rules': this.overlay = 'rules'; return this.render();
         case 'menu': this.overlay = 'menu'; return this.render();
+        case 'chat': this.overlay = this.overlay === 'chat' ? null : 'chat'; return this.render();
+        case 'react': {
+          const now = Date.now();
+          this.overlay = null;
+          if (this.lastReact && now - this.lastReact < 2000) { this.render(); return this.toast('Wait a moment'); }
+          this.lastReact = now;
+          Client.send({ k: 'react', i: Number(el.dataset.i) });
+          return this.render();
+        }
         case 'history': this.overlay = 'history'; return this.render();
         case 'last': this.overlay = 'last'; return this.render();
         case 'close':
