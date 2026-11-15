@@ -292,6 +292,14 @@ input{font:inherit}
 .avpick{width:58px;height:58px}
 .avpick img,.av.pic img,.lav img{width:100%;height:100%;display:block;border-radius:50%;-webkit-user-drag:none}
 .av.pic{border-radius:50% !important;background:transparent}
+
+/* home and lobby scroll when taller than the screen */
+.home,.lobby{height:100%;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;justify-content:flex-start;padding-bottom:40px}
+.home>:first-child,.lobby>:first-child{margin-top:auto}
+.home>:last-child,.lobby>:last-child{margin-bottom:auto}
+.lobby .code{font-size:36px}
+.ltable{height:380px;margin:6px 0 10px}
+.home>*,.lobby>*{flex-shrink:0}
 </style>
 </head>
 <body>
@@ -1088,6 +1096,13 @@ input{font:inherit}
         else this.removeBot(s);
         return this.changed();
       }
+      if (m.k === 'unseat' && host) {
+        // free the seat of a player who went offline before the game started
+        if (this.game) return;
+        const q = this.seated()[Number(m.seat)];
+        if (q && !q.bot && !q.online) { q.seat = -1; return this.changed(); }
+        return;
+      }
       if (m.k === 'timer' && host) {
         const v = Number(m.secs);
         if ([5, 10, 20].includes(v)) { this.settings.turnSecs = v; this.timerSeq = -1; }
@@ -1508,7 +1523,7 @@ input{font:inherit}
       const kind = practice ? 'practice' : App.transport.kind;
       this.table = new window.BelotTable({
         code, owner: me.token, kind, practice, fast: qs.get('fast'), localToken: me.token,
-        staleMs: kind === 'room' ? 15000 : 0,
+        staleMs: kind === 'room' ? 15000 : kind === 'practice' ? 0 : 12000, // a phone silent this long counts as offline
         send: (tok, msg) => this.deliver(tok, msg),
         save: (d) => store.set('belot-host', Object.assign(d, { t: Date.now() })),
       });
@@ -1917,7 +1932,7 @@ input{font:inherit}
         const team = s % 2 === 0 ? 'A' : 'B';
         let inner;
         if (p && p.bot) inner = `<div class="sname">${esc(p.name)} <span class="tag bot">bot</span></div>${this.host() ? `<button class="btn tiny ghost" data-a="rmbot" data-s="${s}">Remove</button>` : '<div class="on">ready</div>'}`;
-        else if (p) inner = `${Number.isInteger(p.avatar) && window.BelotAvatars ? `<div class="lav">${window.BelotAvatars[p.avatar]}</div>` : ''}<div class="sname">${esc(p.name)}${p.host ? ' <span class="tag">host</span>' : ''}</div><div class="${p.online ? 'on' : 'off'}">${p.online ? 'ready' : 'offline'}</div>${s === mySeat ? '<button class="btn tiny ghost" data-a="sit" data-s="-1">Stand up</button>' : ''}`;
+        else if (p) inner = `${Number.isInteger(p.avatar) && window.BelotAvatars ? `<div class="lav">${window.BelotAvatars[p.avatar]}</div>` : ''}<div class="sname">${esc(p.name)}${p.host ? ' <span class="tag">host</span>' : ''}</div><div class="${p.online ? 'on' : 'off'}">${p.online ? 'ready' : 'offline'}</div>${s === mySeat ? '<button class="btn tiny ghost" data-a="sit" data-s="-1">Stand up</button>' : !p.online && this.host() ? `<button class="btn tiny ghost" data-a="unseat" data-s="${s}">Free seat</button>` : ''}`;
         else inner = `<button class="btn tiny" data-a="sit" data-s="${s}">Sit here</button>${this.host() ? `<button class="btn tiny ghost" data-a="addbot" data-s="${s}">Add bot</button>` : ''}`;
         return `<div class="lseat ${pos} team${team} ${s === mySeat ? 'mine' : ''}"><div class="tlabel">Team ${team}</div>${inner}</div>`;
       };
@@ -1927,11 +1942,11 @@ input{font:inherit}
           ${link ? `<button class="btn tiny" data-a="copy" data-t="${esc(link)}">Copy invite link</button>` : '<div class="small muted">Friends open this same page and join with the code</div>'}</div>
         <div class="ltable">${seat(2, 'top')}${seat(3, 'left')}${seat(1, 'right')}${seat(0, 'bottom')}<div class="lmid">Partners sit opposite</div></div>
         ${L.watchers.length ? `<p class="muted small">Not seated: ${L.watchers.map(esc).join(', ')}</p>` : ''}
-        <div class="small muted" style="text-align:center;margin-top:4px">Your character</div>
-        ${this.avatarRow(L.taken)}
-        ${this.timerRow(L.turnSecs)}
         ${this.host() && !all ? '<button class="btn ghost" data-a="fillbots">Fill empty seats with bots</button>' : ''}
         ${this.host() ? `<button class="btn primary" data-a="start" ${all ? '' : 'disabled'}>${all ? 'Start game' : 'Waiting for 4 players'}</button>` : `<p class="muted">${all ? 'Waiting for the host to start' : 'Waiting for 4 players'}</p>`}
+        <div class="small muted" style="text-align:center;margin-top:10px">Your character</div>
+        ${this.avatarRow(L.taken)}
+        ${this.timerRow(L.turnSecs)}
         <button class="link" data-a="leave">Leave table</button>
       </div>`;
     },
@@ -2309,6 +2324,7 @@ input{font:inherit}
           store.del('belot-host');
           return App.createTable(null, true);
         case 'addbot': return Client.send({ k: 'addbot', seat: Number(el.dataset.s) });
+        case 'unseat': return Client.send({ k: 'unseat', seat: Number(el.dataset.s) });
         case 'rmbot': return Client.send({ k: 'rmbot', seat: Number(el.dataset.s) });
         case 'fillbots': return Client.send({ k: 'fillbots' });
         case 'timer': return Client.send({ k: 'timer', secs: Number(el.dataset.t) });

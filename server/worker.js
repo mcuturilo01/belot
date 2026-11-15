@@ -782,6 +782,13 @@
         else this.removeBot(s);
         return this.changed();
       }
+      if (m.k === 'unseat' && host) {
+        // free the seat of a player who went offline before the game started
+        if (this.game) return;
+        const q = this.seated()[Number(m.seat)];
+        if (q && !q.bot && !q.online) { q.seat = -1; return this.changed(); }
+        return;
+      }
       if (m.k === 'timer' && host) {
         const v = Number(m.secs);
         if ([5, 10, 20].includes(v)) { this.settings.turnSecs = v; this.timerSeq = -1; }
