@@ -1368,7 +1368,8 @@ input{font:inherit}
         window.addEventListener('online', wake);
         return {
           send(msg) { if (conn && conn.open) try { conn.send(msg); } catch (e) { /* ignore */ } },
-          kick() { if (!closed) retry(50); }, // silent link (e.g. after the phone slept): rebuild it
+          // a link that is open but silent (e.g. after the phone slept) gets rebuilt; never one still connecting
+          kick() { if (!closed && conn && conn.open) retry(50); },
           close() { closed = true; clearTimeout(retryT); try { peer && peer.destroy(); } catch (e) { /* ignore */ } },
         };
       },
@@ -1459,7 +1460,7 @@ input{font:inherit}
         open();
         return {
           send(m) { if (ws && ws.readyState === 1) try { ws.send(JSON.stringify(m)); } catch (e) { /* ignore */ } },
-          kick() { if (!closed) { tries = 0; open(); } }, // replace a silent socket
+          kick() { if (!closed && ws && ws.readyState === 1) { tries = 0; open(); } }, // replace an open but silent socket
           close() { closed = true; clearTimeout(timer); if (ws) try { ws.close(); } catch (e) { /* ignore */ } },
         };
       },
@@ -1565,6 +1566,7 @@ input{font:inherit}
     connect(code, create) {
       this.code = code;
       this.create = !!create;
+      this.lastMsg = Date.now();
       this.net = App.transport.join(code, {
         token: me.token,
         onMsg: (m) => this.onMsg(m),
@@ -1575,7 +1577,7 @@ input{font:inherit}
         this.send({ k: 'ping', seq: this.view ? this.view.seq : -1 });
         const quiet = Date.now() - this.lastMsg;
         // a socket that looks open but stays silent (common after the phone sleeps) gets replaced
-        if (quiet > 9000 && this.net && this.net.kick) this.net.kick();
+        if (quiet > 9000 && this.net && this.net.kick) { this.net.kick(); this.lastMsg = Date.now() - 3000; } // at most one rebuild every ~6 s
         if (quiet > 12000) App.setNet('waiting');
       }, 3000);
       setInterval(() => this.resend(), 2000);
@@ -1659,8 +1661,10 @@ input{font:inherit}
       const fresh = (x) => x && Date.now() - x.t < 8 * 3600e3;
       if (this.transport.kind !== 'server' && fresh(h) && !h.practice && (!hashCode || hashCode === h.code) && me.name) return this.createTable(h);
       if (hashCode && /^[A-Z0-9]{4,8}$/.test(hashCode) && me.name) {
-        if (fresh(c) && c.code === hashCode) return this.joinTable(hashCode);
-        UI.joinCode = hashCode;
+        return this.joinTable(hashCode); // invite link + known name: straight into the room
+      }
+      if (hashCode && /^[A-Z0-9]{4,8}$/.test(hashCode)) {
+        UI.joinCode = hashCode; // new player: code is filled in, they only type a name and tap Join
       }
       UI.render();
     },
