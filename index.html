@@ -1929,7 +1929,7 @@ input{font:inherit}
       return `<div class="home"><div class="logo">Belot</div><p class="muted">Connecting…</p><button class="btn ghost" data-a="leave">Cancel</button></div>`;
     },
     lobbyHTML(L) {
-      const link = L.kind === 'p2p' && location.protocol.startsWith('http') ? location.href.split('#')[0] + '#' + L.code : '';
+      const link = (L.kind === 'p2p' || L.kind === 'server') && location.protocol.startsWith('http') ? location.href.split('#')[0] + '#' + L.code : '';
       const mySeat = Client.seat;
       const seat = (s, pos) => {
         const p = L.seats[s];
@@ -1943,7 +1943,7 @@ input{font:inherit}
       const all = L.seats.every(Boolean);
       return `<div class="lobby">
         <div class="lhead"><div class="muted small">Table code</div><div class="code">${esc(L.code)}</div>
-          ${link ? `<button class="btn tiny" data-a="copy" data-t="${esc(link)}">Copy invite link</button>` : '<div class="small muted">Friends open this same page and join with the code</div>'}</div>
+          ${link ? `<button class="btn tiny" data-a="copy" data-t="${esc(link)}">${navigator.share ? 'Share invite link' : 'Copy invite link'}</button>` : '<div class="small muted">Friends open this same page and join with the code</div>'}</div>
         <div class="ltable">${seat(2, 'top')}${seat(3, 'left')}${seat(1, 'right')}${seat(0, 'bottom')}<div class="lmid">Partners sit opposite</div></div>
         ${L.watchers.length ? `<p class="muted small">Not seated: ${L.watchers.map(esc).join(', ')}</p>` : ''}
         ${this.host() && !all ? '<button class="btn ghost" data-a="fillbots">Fill empty seats with bots</button>' : ''}
@@ -2256,7 +2256,7 @@ input{font:inherit}
       const L = Client.lobby;
       return `<div class="overlay" data-a="close"><div class="sheet"><div class="shead">Table ${esc(L.code)}</div>
         <div class="small muted">${L.seats.map((p, i) => `${esc(p ? p.name : '-')} ${p && p.online ? '●' : '○'}`).join(' · ')}</div>
-        ${L.kind === 'p2p' ? `<button class="btn" data-a="copy" data-t="${esc(location.href.split('#')[0] + '#' + L.code)}">Copy invite link</button>` : ''}
+        ${L.kind === 'p2p' || L.kind === 'server' ? `<button class="btn" data-a="copy" data-t="${esc(location.href.split('#')[0] + '#' + L.code)}">${navigator.share ? 'Share invite link' : 'Copy invite link'}</button>` : ''}
         ${this.timerRow(L.turnSecs)}
         <button class="btn" data-a="rules">Rules used</button>
         <button class="btn danger" data-a="leaveask">Leave table</button>
@@ -2342,7 +2342,10 @@ input{font:inherit}
         case 'copy': {
           const t = el.dataset.t;
           const done = () => this.toast('Link copied');
-          try { navigator.clipboard.writeText(t).then(done, () => this.toast(t)); } catch (err) { this.toast(t); }
+          const copy = () => { try { navigator.clipboard.writeText(t).then(done, () => this.toast(t)); } catch (err) { this.toast(t); } };
+          // phones: open the share sheet (WhatsApp, Messages...); otherwise copy
+          if (navigator.share) { navigator.share({ title: 'Belot', text: 'Join my Belot table ' + (Client.lobby ? Client.lobby.code : ''), url: t }).catch((e) => { if (!e || e.name !== 'AbortError') copy(); }); return; }
+          copy();
           return;
         }
         case 'leave': return App.leave();
