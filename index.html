@@ -300,6 +300,7 @@ input{font:inherit}
 .lobby .code{font-size:36px}
 .ltable{height:380px;margin:6px 0 10px}
 .home>*,.lobby>*{flex-shrink:0}
+.codebtn{background:none;border:0;color:#fff;font-weight:800;cursor:pointer;padding:0;display:block;margin:0 auto}
 </style>
 </head>
 <body>
@@ -1942,7 +1943,7 @@ input{font:inherit}
       };
       const all = L.seats.every(Boolean);
       return `<div class="lobby">
-        <div class="lhead"><div class="muted small">Table code</div><div class="code">${esc(L.code)}</div>
+        <div class="lhead"><div class="muted small">Table code</div>${link ? `<button class="code codebtn" data-a="copy" data-t="${esc(link)}">${esc(L.code)}</button>` : `<div class="code">${esc(L.code)}</div>`}
           ${link ? `<button class="btn tiny" data-a="copy" data-t="${esc(link)}">${navigator.share ? 'Share invite link' : 'Copy invite link'}</button>` : '<div class="small muted">Friends open this same page and join with the code</div>'}</div>
         <div class="ltable">${seat(2, 'top')}${seat(3, 'left')}${seat(1, 'right')}${seat(0, 'bottom')}<div class="lmid">Partners sit opposite</div></div>
         ${L.watchers.length ? `<p class="muted small">Not seated: ${L.watchers.map(esc).join(', ')}</p>` : ''}
