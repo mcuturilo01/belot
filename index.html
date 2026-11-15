@@ -826,7 +826,8 @@ input{font:inherit}
     };
     // declarations: types are announced at the first trick, details shown from the second trick
     v.announced = (state.declared || [[], [], [], []]).map((ds, s) =>
-      ds.map((d) => (state.trickNo >= 1 || s === seat ? d : { kind: d.kind, len: d.len, pts: d.kind === 'seq' ? d.pts : undefined })));
+      // others only learn the type (Tierce, Quarte...); which cards stays hidden until the deal is scored
+      ds.map((d) => (s === seat || state.phase === 'dealEnd' || state.phase === 'gameOver' ? d : { kind: d.kind, len: d.len })));
     if (seat >= 0 && state.phase === 'play' && state.turn === seat) {
       const ct = state.contract.type;
       v.legal = legalCards(state.hands[seat], state.trick, ct, seat);
@@ -1002,7 +1003,7 @@ input{font:inherit}
       this.practice = !!o.practice;
       this.players = {};
       this.game = null;
-      this.settings = { turnSecs: 10 };
+      this.settings = { turnSecs: 15 };
       this.timer = null; this.timerSeq = -1; this.clock = null;
       this.F = o.fast ? 0.15 : 1;
     }
@@ -1011,7 +1012,7 @@ input{font:inherit}
       this.players = d.players || {};
       this.game = d.game || null;
       if (d.settings) this.settings = d.settings;
-      if (![5, 10, 20].includes(this.settings.turnSecs)) this.settings.turnSecs = 10; // older options
+      if (![10, 15, 20].includes(this.settings.turnSecs)) this.settings.turnSecs = 15; // older options
       if (d.owner) this.owner = d.owner;
       if (d.practice) this.practice = true;
       for (const t in this.players) if (!this.players[t].bot) this.players[t].online = false;
@@ -1106,7 +1107,7 @@ input{font:inherit}
       }
       if (m.k === 'timer' && host) {
         const v = Number(m.secs);
-        if ([5, 10, 20].includes(v)) { this.settings.turnSecs = v; this.timerSeq = -1; }
+        if ([10, 15, 20].includes(v)) { this.settings.turnSecs = v; this.timerSeq = -1; }
         return this.changed();
       }
       if (m.k === 'start' && host) {
@@ -1508,7 +1509,7 @@ input{font:inherit}
   const PACE = { cut: 800, step: 170, fly: 320, banner: 900, hold: 350, slide: 320, deal5: 2800, deal3: 2300, collect: 1500 };
   // quick chat options (index is what travels over the network)
   const REACTIONS = ['😂', '😘', '🤭', '😭', '🥺', '😡', '😈', '🤡',
-    'nice job pal', 'good luck', 'thanks', 'too easy', 'hurry up 🐢', 'so lucky', 'just give up', 'im getting bored here'];
+    'nice job pal', 'good luck', 'thanks', 'too easy', 'hurry up 🐢', 'so lucky', 'haha losers', 'oh boy'];
   const SYM = { C: '♣︎', D: '♦︎', H: '♥︎', S: '♠︎' };
   const RED = { D: 1, H: 1 };
   const RLAB = { T: '10' };
@@ -1973,7 +1974,7 @@ input{font:inherit}
       else if (this.pop && this.pop.seat === seat && now < this.pop.until) big = `<div class="bigbub ${this.pop.bid === 'pass' ? 'pass' : ''}" style="animation-delay:${this.pop.t0 - now}ms">${this.bidShort(this.pop.bid)}</div>`;
       const tags = [];
       if (v.phase === 'play' || v.phase === 'trickDone' || v.phase === 'dealEnd') {
-        for (const d of v.announced[seat] || []) tags.push(this.declShort(d, v.trickNo >= 1 || seat === Client.seat));
+        for (const d of v.announced[seat] || []) tags.push(this.declShort(d, seat === Client.seat || v.phase === 'dealEnd' || v.phase === 'gameOver'));
         for (const b of v.belotes) if (b.seat === seat) tags.push('Belote' + (v.contract.type === 'AT' ? ' ' + SYM[b.suit] : ''));
       }
       const bidder = v.contract && v.contract.bidder === seat && v.phase !== 'bid' ? '<span class="bid-chip">' + this.ctChip(v.contract) + '</span>' : '';
@@ -2015,7 +2016,7 @@ input{font:inherit}
     },
     timerRow(secs) {
       if (!this.host()) return `<div class="small muted trow">Turn timer: ${secs} s</div>`;
-      return `<div class="trow"><span class="small">Turn timer</span>${[5, 10, 20].map((t) => `<button class="chip ${t === secs ? 'on' : ''}" data-a="timer" data-t="${t}">${t}s</button>`).join('')}</div>`;
+      return `<div class="trow"><span class="small">Turn timer</span>${[10, 15, 20].map((t) => `<button class="chip ${t === secs ? 'on' : ''}" data-a="timer" data-t="${t}">${t}s</button>`).join('')}</div>`;
     },
     bidShort(b) {
       if (b === 'pass') return 'PASS';

@@ -511,7 +511,8 @@
     };
     // declarations: types are announced at the first trick, details shown from the second trick
     v.announced = (state.declared || [[], [], [], []]).map((ds, s) =>
-      ds.map((d) => (state.trickNo >= 1 || s === seat ? d : { kind: d.kind, len: d.len, pts: d.kind === 'seq' ? d.pts : undefined })));
+      // others only learn the type (Tierce, Quarte...); which cards stays hidden until the deal is scored
+      ds.map((d) => (s === seat || state.phase === 'dealEnd' || state.phase === 'gameOver' ? d : { kind: d.kind, len: d.len })));
     if (seat >= 0 && state.phase === 'play' && state.turn === seat) {
       const ct = state.contract.type;
       v.legal = legalCards(state.hands[seat], state.trick, ct, seat);
@@ -687,7 +688,7 @@
       this.practice = !!o.practice;
       this.players = {};
       this.game = null;
-      this.settings = { turnSecs: 10 };
+      this.settings = { turnSecs: 15 };
       this.timer = null; this.timerSeq = -1; this.clock = null;
       this.F = o.fast ? 0.15 : 1;
     }
@@ -696,7 +697,7 @@
       this.players = d.players || {};
       this.game = d.game || null;
       if (d.settings) this.settings = d.settings;
-      if (![5, 10, 20].includes(this.settings.turnSecs)) this.settings.turnSecs = 10; // older options
+      if (![10, 15, 20].includes(this.settings.turnSecs)) this.settings.turnSecs = 15; // older options
       if (d.owner) this.owner = d.owner;
       if (d.practice) this.practice = true;
       for (const t in this.players) if (!this.players[t].bot) this.players[t].online = false;
@@ -791,7 +792,7 @@
       }
       if (m.k === 'timer' && host) {
         const v = Number(m.secs);
-        if ([5, 10, 20].includes(v)) { this.settings.turnSecs = v; this.timerSeq = -1; }
+        if ([10, 15, 20].includes(v)) { this.settings.turnSecs = v; this.timerSeq = -1; }
         return this.changed();
       }
       if (m.k === 'start' && host) {
