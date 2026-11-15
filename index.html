@@ -1716,7 +1716,13 @@ input{font:inherit}
         if (e.target.id === 'code') this.joinCode = e.target.value.toUpperCase();
         if (e.target.id === 'cutr') { const o = $('#cutv'); if (o) o.textContent = e.target.value; }
       });
-      window.addEventListener('resize', () => this.render());
+      // Android shrinks the page when the keyboard opens: never redraw under a text box being typed in
+      window.addEventListener('resize', () => {
+        const a = document.activeElement;
+        if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA')) return;
+        clearTimeout(this.rsT);
+        this.rsT = setTimeout(() => this.render(), 120);
+      });
     },
     keepAwake() {
       const req = async () => { try { if (navigator.wakeLock) this.wl = await navigator.wakeLock.request('screen'); } catch (e) { /* ignore */ } };
@@ -1841,7 +1847,14 @@ input{font:inherit}
       else html = this.homeHTML();
       const prevPos = this.handPos || {};
       const an = this.announce && Date.now() < this.announce.until ? `<div class="announce" style="animation-delay:${this.announce.t0 - Date.now()}ms">${esc(this.announce.text)}</div>` : '';
+      // keep the text box being typed in (and its cursor) across redraws
+      const fe = document.activeElement;
+      const keep = fe && fe.id && (fe.tagName === 'INPUT' || fe.tagName === 'TEXTAREA') ? { id: fe.id, v: fe.value, a: fe.selectionStart, b: fe.selectionEnd } : null;
       root.innerHTML = html + an;
+      if (keep) {
+        const el = document.getElementById(keep.id);
+        if (el) { el.value = keep.v; el.focus({ preventScroll: true }); try { el.setSelectionRange(keep.a, keep.b); } catch (e) { /* ignore */ } }
+      }
       this.renderBanner();
       this.animateHand(prevPos);
       // re-render when the shot clock starts and when it enters its last 5 seconds
